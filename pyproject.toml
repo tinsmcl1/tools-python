@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools",
+            "setuptools_scm",
+            "wheel"]
+build-backend = 'setuptools.build_meta'
+    
+[project]
+name = "hapitools"
+version = "0.1"
+authors = [ {name = "Johns Hopkins University Applied Physics Laboratory LLC", email = "sandy.antunes@jhuapl.edu"}]
+license = {text = "BSD-3 License"}
+description = "Additional hapiclient tools including merge, etc"
+readme = "README.md"
+keywords = ["HAPI"]
+classifiers=[
+        "Development Status :: 4 - Beta",
+        "Topic :: Utilities",
+        "License :: OSI Approved :: BSD-3 License",
+        ]
+requires-python = ">=3.8"
+dependencies = [
+    "numpy",
+    "pandas",
+    ]
+
+[project.urls]
+Homepage = "https://hapi-server.org"
+Documentation = "https://github.com/hapi-server/tools-python"
+Repository = "https://github.com/hapi-server/tools-python"
