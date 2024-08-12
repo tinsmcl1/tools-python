@@ -1,6 +1,6 @@
 from hapiclient import hapi
 from hapiplot import hapiplot
-import hapitools
+import hapiutils
 
 opts = {'logging': False, 'usecache': True, 'cachedir': './hapicache' }
 server     = 'https://cdaweb.gsfc.nasa.gov/hapi'
@@ -41,23 +41,23 @@ dataI=dataI[0:10]
 
 choice = input("Test case AC, AD, CD, AS, AO, AI, SO, SI, OI: ")
 if choice == "AC":
-    newAC, metaAC = hapitools.merge_hapi(dataA, metaA, dataC, metaC, True)
+    newAC, metaAC = hapiutils.merge_hapi(dataA, metaA, dataC, metaC, True)
 elif choice == "AD":
-    newAC, metaAC = hapitools.merge_hapi(dataA, metaA, dataD, metaD, True)
+    newAC, metaAC = hapiutils.merge_hapi(dataA, metaA, dataD, metaD, True)
 elif choice == "CD":
-    newAC, metaAC = hapitools.merge_hapi(dataC, metaC, dataD, metaD, True)
+    newAC, metaAC = hapiutils.merge_hapi(dataC, metaC, dataD, metaD, True)
 elif choice == "AS":
-    newAC, metaAC = hapitools.merge_hapi(dataA, metaA, dataS, metaS, True)
+    newAC, metaAC = hapiutils.merge_hapi(dataA, metaA, dataS, metaS, True)
 elif choice == "AI":
-    newAC, metaAC = hapitools.merge_hapi(dataA, metaA, dataI, metaI, True)
+    newAC, metaAC = hapiutils.merge_hapi(dataA, metaA, dataI, metaI, True)
 elif choice == "AO":
-    newAC, metaAC = hapitools.merge_hapi(dataA, metaA, dataO, metaO, True)
+    newAC, metaAC = hapiutils.merge_hapi(dataA, metaA, dataO, metaO, True)
 elif choice == "SO":
-    newAC, metaAC = hapitools.merge_hapi(dataS, metaS, dataO, metaO, True)
+    newAC, metaAC = hapiutils.merge_hapi(dataS, metaS, dataO, metaO, True)
 elif choice == "SI":
-    newAC, metaAC = hapitools.merge_hapi(dataS, metaS, dataI, metaI, True)
+    newAC, metaAC = hapiutils.merge_hapi(dataS, metaS, dataI, metaI, True)
 elif choice == "OI":
-    newAC, metaAC = hapitools.merge_hapi(dataO, metaO, dataI, metaI, True)
+    newAC, metaAC = hapiutils.merge_hapi(dataO, metaO, dataI, metaI, True)
 else:
     exit()
 print("\nMerged:",newAC[0:3])
