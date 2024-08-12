@@ -1,7 +1,7 @@
 # tools-python
 Additional tools to support hapiclient, including merge, etc.  Currently consists of 'merge_hapi()' and 'hapi_to_df()'.  Cloud HAPI coming soon.  Assuming you have fetched 2 HAPI datasets and their metadata using hapiclient ( dataA, metaA and dataB, metaB):
 
-    merged_data, merged_meta = hapitools.merge_hapi(dataA, metaA, dataB, metaB, round_to_sec=True)
+    merged_data, merged_meta = hapiutils.merge_hapi(dataA, metaA, dataB, metaB, round_to_sec=True)
 
 Useful to feed into hapi-nn (see https://github.com/hapi-server/application-neuralnetwork-python)
 
@@ -13,7 +13,7 @@ Full example:
 
     from hapiclient import hapi
     from hapiplot import hapiplot
-    import hapitools
+    import hapiutils
 
     opts = {'logging': False, 'usecache': True, 'cachedir': './hapicache' }
     start      = '2013-01-01T00:00:54Z'
@@ -23,5 +23,5 @@ Full example:
 
     dataA, metaA = hapi(serverA, datasetA, parametersA, start, stop, **opts)
     dataB, metaB = hapi(serverB, datasetB, parametersB, start, stop, **opts)
-    newAB, metaAB = hapitools.merge_hapi(dataA, metaA, dataB, metaB, True)
+    newAB, metaAB = hapiutils.merge_hapi(dataA, metaA, dataB, metaB, True)
     hapiplot(newAB, metaAB)
