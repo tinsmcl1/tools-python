@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 import copy
 from datetime import datetime, timedelta
+from typing import Literal
+from hapiclient.hapi import compute_dt
 
 
 def nparray_unpack_to_list(arr) -> list:
@@ -57,55 +59,41 @@ def hapi_to_df(data, round_to_sec: bool = False) -> pd.DataFrame:
 
 
 def merge_hapi(
-    dataA, metaA, dataB, metaB, round_to_sec: bool = False, fill_nan: bool = False, join_all: bool = True
-):
-    """Merge two hapi data arrays to a single array. Returns merged hapi data and meta objects.
+    dataA, metaA, dataB, metaB, how: Literal["left", "right", "outer", "inner"] = "outer", round_to_sec: bool = False, fill_nan: bool = False):
+    """Merge two hapi data arrays to single array via specified merge type. Returns merged hapi data and meta objects.
 
     Args:
-        data1 (_type_): Left hapi array to merge
-        meta1 (_type_): Meta corresponding with data1
-        data2 (_type_): Right hapi array to merge
-        meta2 (_type_): Meta corresponding with data2
+        dataA: Left hapi array to merge
+        metaA: Meta corresponding with dataA
+        dataB: Right hapi array to merge
+        metaB: Meta corresponding with dataB
+        how (str, optional): Type of merge: 'left', 'right', 'outer', or 'inner'. See documentation for pandas.merge_ordered for descriptions. Defaults to 'outer'.
         round_to_sec (bool, optional): Rounds time to nearest second. Defaults to False.
         fill_nan (bool, optional): Fill NaNs according to fill_value from meta. Defaults to False.
-        join_all (bool, optional): _description_
     """
     metaAB = copy.deepcopy(metaA)
-    for ele in metaB["parameters"]:
-        if ele["name"] != "Time" and (join_all or (ele not in metaA["parameters"])):
-            # adjust both dataframe name and hapi metadata
-            if ele in metaA["parameters"]:
-                name = ele["name"]
-                new_name = (
-                    f"{name}_{metaB['x_dataset']}"  # does x_dataset always exist?
-                )
-                dataB = nrecfun.rename_fields(dataB, {name: new_name})
-                ele["name"] = new_name
-            metaAB["parameters"].append(ele)
+    new_names = {}
+    for param in metaB["parameters"]:
+        if param["name"] != "Time":
+            # If the field is already in the left array, change the field name
+            if param in metaA["parameters"]:
+                new_name = f"{param['name']}_{metaB['x_dataset']}"  # TODO: does x_dataset always exist?
+                new_names[param["name"]] = new_name
+                param["name"] = new_name
+            # Update meta
+            metaAB["parameters"].append(param)
 
+    dataB = nrecfun.rename_fields(dataB, new_names)
+
+    # Convert structured arrays to DataFrames and merge on "Time" fields
     dfA = hapi_to_df(dataA, round_to_sec=round_to_sec)
     dfB = hapi_to_df(dataB, round_to_sec=round_to_sec)
-    dt = merge_dtypes(dataA, dataB, trim="Time")
-    dfAB = pd.merge_ordered(dfA, dfB)  # Works!
+    dfAB = pd.merge_ordered(dfA, dfB, on="Time", how=how)
 
-    # walk through dfAC and fill all numeric 'NaN' with 'fill' from meta
     if fill_nan:
-        for ele in metaAB["parameters"]:
-            name = ele["name"]
-            try:
-                if ele["fill"] != None:
-                    fill = float(ele["fill"])
-                    print("Filling with: ", fill, ele)
-                    dfAB[name] = dfAB[name].fillna(fill)
-            except:
-                print("NO fill for ", ele["fill"], ele)
-                pass
+        dfAB = df_fill_nans(dfAB, metaAB)
 
-    dataAB = dfAB.to_records(index=False, column_dtypes={"Time": "S30"})
-    dataAB = np.array(
-        [tuple([nparray_unpack_to_list(e) for e in elm]) for elm in dataAB], dtype=dt
-    )
-    dataAB = np.array([tuple(i) for i in dataAB], dtype=dt)
+    dataAB = df_to_hapi(dfAB, metaAB)
 
     return dataAB, metaAB
 
@@ -126,4 +114,43 @@ def clean_time(df: pd.DataFrame, round_to_sec: bool = False) -> pd.DataFrame:
     df["Time"] = df["Time"].dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
     return df
 
+
+def df_fill_nans(df, meta) -> pd.DataFrame:
+    """Returns new hapi DataFrame with all NaN values filled according to fill_value in meta."""
+    for param in meta["parameters"]:
+        name = param["name"]
+        if param["fill"] is None:
+            print(f"No fill: {param['name']} --> {param['fill']}")
+        else:
+            try:
+                fill = float(param["fill"])
+                df[name] = df[name].fillna(fill)
+                print(f"Fill successful: {param['name']} --> {param['fill']}")
+            except:
+                print(f"Fill failed: {param['name']} -> {param['fill']}")
+                pass
+    return df
+
+
+def dtypes_from_data(data) -> list:
+    """Returns parameter data types from hapi data array."""
+    dt = [(param, data.dtype.fields[param][0]) for param in data.dtype.names]
+    return dt
+
+
+def dtypes_from_meta(meta) -> list:
+    """Returns parameter data types from meta."""
+    dt, _, _, _, _, _ = compute_dt(meta, {"format": ""})
+    return dt
+
+
+def df_to_hapi(df, meta):
+    """Converts a hapi DataFrame to a hapi array."""
+    dt = dtypes_from_meta(meta)
+    data = df.to_records(index=False, column_dtypes={"Time": "S30"})
+    data = np.array(
+        [tuple([nparray_unpack_to_list(e) for e in elm]) for elm in data], dtype=dt
+    )
+    data = np.array([tuple(i) for i in data], dtype=dt)
+    return data
 
