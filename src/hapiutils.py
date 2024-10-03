@@ -7,13 +7,14 @@ from datetime import datetime, timedelta
 
 
 def nparray_unpack_to_list(arr) -> list:
+    """Converts a np.ndarray to a list."""
     if type(arr) == np.ndarray:
         return arr.tolist()
     else:
         return arr
 
 
-def merge_dtypes(dataA, dataB, trim="Time"):
+def merge_dtypes(dataA, dataB, trim: str = "Time"):
     """could not use stackoverflow comprehensives of forms a[0],str(a[1]) because
     it fails on 2D items like ('Field_Vector', '<f8', (3,))
     so we do it manually (and also strip out the extra 'Time' field
@@ -28,7 +29,19 @@ def merge_dtypes(dataA, dataB, trim="Time"):
     return a
 
 
-def hapi_to_df(dataA, round_to_sec=False, clean_time=False):
+def hapi_to_df(
+    data, round_to_sec: bool = False, clean_time: bool = False
+) -> pd.DataFrame:
+    """Convert hapi data array to a pandas DataFrame while preserving data types.
+
+    Args:
+        data (_type_): Hapi data array.
+        round_to_sec (bool, optional): Round time to nearest second. Defaults to False.
+        clean_time (bool, optional): _description_. Defaults to False.
+
+    Returns:
+        pd.DataFrame: Hapi data in a pandas DataFrame.
+    """
     # automatically 'cleans' hapitimes as well
 
     # if round_to_sec:
@@ -36,79 +49,90 @@ def hapi_to_df(dataA, round_to_sec=False, clean_time=False):
 
     has_multiD = False
     multiD = {}
-    namelist = list(dataA.dtype.names)
-    for name in dataA.dtype.names:
+    namelist = list(data.dtype.names)
+    for name in data.dtype.names:
         try:
-            if dataA[name].shape[1]:
+            if data[name].shape[1]:
                 has_multiD = True
                 multiD[name] = True
         except:
             multiD[name] = False
 
     if has_multiD:
-        dfA = pd.DataFrame({"Time": dataA["Time"]})  # ,dtype='string')
+        df = pd.DataFrame({"Time": data["Time"]})  # ,dtype='string')
         namelist.remove("Time")
         for name in namelist:
             if multiD[name]:
                 # dfA[name] = pd.Series(dtype='object')
-                dfA[name] = list(dataA[name])  # list or tuple work
+                df[name] = list(data[name])  # list or tuple work
                 # dfA[name] = dataA[name].astype(object)
                 # ",".join([str(val) for val in dataA[name]])
             else:
-                dfA[name] = dataA[name]
+                df[name] = data[name]
     else:
         # easy case, all 1-D data so no fussing needed
-        dfA = pd.DataFrame(dataA)
+        df = pd.DataFrame(data)
 
     # clean times
-    dfA["Time"] = pd.to_datetime(
-        dfA["Time"].str.decode("utf-8")
+    df["Time"] = pd.to_datetime(
+        df["Time"].str.decode("utf-8")
     )  # hapitime2datetime(np.array(dfA['Time']),**ops)
     if round_to_sec:
-        dfA["Time"] = dfA["Time"].dt.round("S")
-    dfA["Time"] = dfA["Time"].dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        df["Time"] = df["Time"].dt.round("S")
+    df["Time"] = df["Time"].dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
-    return dfA
+    return df
 
 
 def merge_hapi(
-    dataA, metaA, dataC, metaC, round_to_sec=False, fill_nan=False, join_all=True
+    dataA, metaA, dataB, metaB, round_to_sec: bool = False, fill_nan: bool = False, join_all: bool = True
 ):
-    metaAC = copy.deepcopy(metaA)
-    for ele in metaC["parameters"]:
+    """Merge two hapi data arrays to a single array. Returns merged hapi data and meta objects.
+
+    Args:
+        data1 (_type_): Left hapi array to merge
+        meta1 (_type_): Meta corresponding with data1
+        data2 (_type_): Right hapi array to merge
+        meta2 (_type_): Meta corresponding with data2
+        round_to_sec (bool, optional): Rounds time to nearest second. Defaults to False.
+        fill_nan (bool, optional): Fill NaNs according to fill_value from meta. Defaults to False.
+        join_all (bool, optional): _description_
+    """
+    metaAB = copy.deepcopy(metaA)
+    for ele in metaB["parameters"]:
         if ele["name"] != "Time" and (join_all or (ele not in metaA["parameters"])):
             # adjust both dataframe name and hapi metadata
             if ele in metaA["parameters"]:
                 name = ele["name"]
                 new_name = (
-                    f"{name}_{metaC['x_dataset']}"  # does x_dataset always exist?
+                    f"{name}_{metaB['x_dataset']}"  # does x_dataset always exist?
                 )
-                dataC = nrecfun.rename_fields(dataC, {name: new_name})
+                dataB = nrecfun.rename_fields(dataB, {name: new_name})
                 ele["name"] = new_name
-            metaAC["parameters"].append(ele)
+            metaAB["parameters"].append(ele)
 
     dfA = hapi_to_df(dataA, round_to_sec=round_to_sec)
-    dfC = hapi_to_df(dataC, round_to_sec=round_to_sec)
-    dt = merge_dtypes(dataA, dataC, trim="Time")
-    dfAC = pd.merge_ordered(dfA, dfC)  # Works!
+    dfB = hapi_to_df(dataB, round_to_sec=round_to_sec)
+    dt = merge_dtypes(dataA, dataB, trim="Time")
+    dfAB = pd.merge_ordered(dfA, dfB)  # Works!
 
     # walk through dfAC and fill all numeric 'NaN' with 'fill' from meta
     if fill_nan:
-        for ele in metaAC["parameters"]:
+        for ele in metaAB["parameters"]:
             name = ele["name"]
             try:
                 if ele["fill"] != None:
                     fill = float(ele["fill"])
                     print("Filling with: ", fill, ele)
-                    dfAC[name] = dfAC[name].fillna(fill)
+                    dfAB[name] = dfAB[name].fillna(fill)
             except:
                 print("NO fill for ", ele["fill"], ele)
                 pass
 
-    newAC = dfAC.to_records(index=False, column_dtypes={"Time": "S30"})
-    newAC = np.array(
-        [tuple([nparray_unpack_to_list(e) for e in elm]) for elm in newAC], dtype=dt
+    dataAB = dfAB.to_records(index=False, column_dtypes={"Time": "S30"})
+    dataAB = np.array(
+        [tuple([nparray_unpack_to_list(e) for e in elm]) for elm in dataAB], dtype=dt
     )
-    newAC = np.array([tuple(i) for i in newAC], dtype=dt)
+    dataAB = np.array([tuple(i) for i in dataAB], dtype=dt)
 
-    return newAC, metaAC
+    return dataAB, metaAB
