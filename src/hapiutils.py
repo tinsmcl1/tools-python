@@ -136,3 +136,11 @@ def merge_hapi(
     dataAB = np.array([tuple(i) for i in dataAB], dtype=dt)
 
     return dataAB, metaAB
+
+
+def df_round_to_sec(df) -> pd.DataFrame:
+    """Rounds 'Time' column in df to nearest second and returns new DataFrame."""
+    df["Time"] = pd.to_datetime(df["Time"].str.decode("utf-8"))
+    df["Time"] = df["Time"].dt.round("s")
+    df["Time"] = df["Time"].dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    return df
