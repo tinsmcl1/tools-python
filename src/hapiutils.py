@@ -138,9 +138,20 @@ def merge_hapi(
     return dataAB, metaAB
 
 
-def df_round_to_sec(df) -> pd.DataFrame:
-    """Rounds 'Time' column in df to nearest second and returns new DataFrame."""
+def clean_time(df: pd.DataFrame, round_to_sec: bool = False) -> pd.DataFrame:
+    """Converts time to hapi specfied format and optionally rounds time to nearest second.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing "Time" column to clean.
+        round_to_sec (bool, optional): Rounds time to nearest second. Defaults to False.
+
+    Returns:
+        pd.DataFrame: DataFrame with "Time" column cleaned.
+    """
     df["Time"] = pd.to_datetime(df["Time"].str.decode("utf-8"))
-    df["Time"] = df["Time"].dt.round("s")
+    if round_to_sec:
+        df["Time"] = df["Time"].dt.round("s")
     df["Time"] = df["Time"].dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
     return df
+
+
