@@ -29,58 +29,30 @@ def merge_dtypes(dataA, dataB, trim: str = "Time"):
     return a
 
 
-def hapi_to_df(
-    data, round_to_sec: bool = False, clean_time: bool = False
-) -> pd.DataFrame:
-    """Convert hapi data array to a pandas DataFrame while preserving data types.
+def hapi_to_df(data, round_to_sec: bool = False) -> pd.DataFrame:
+    """Convert hapi data array to a pandas DataFrame, preserving data types.
 
     Args:
         data (_type_): Hapi data array.
         round_to_sec (bool, optional): Round time to nearest second. Defaults to False.
-        clean_time (bool, optional): _description_. Defaults to False.
 
     Returns:
         pd.DataFrame: Hapi data in a pandas DataFrame.
     """
-    # automatically 'cleans' hapitimes as well
-
-    # if round_to_sec:
-    #    dataA['Time'] = round_hapitime(dataA['Time'])
-
-    has_multiD = False
-    multiD = {}
-    namelist = list(data.dtype.names)
+    data_dict = {}
     for name in data.dtype.names:
-        try:
-            if data[name].shape[1]:
-                has_multiD = True
-                multiD[name] = True
-        except:
-            multiD[name] = False
+        column_data = data[name]
 
-    if has_multiD:
-        df = pd.DataFrame({"Time": data["Time"]})  # ,dtype='string')
-        namelist.remove("Time")
-        for name in namelist:
-            if multiD[name]:
-                # dfA[name] = pd.Series(dtype='object')
-                df[name] = list(data[name])  # list or tuple work
-                # dfA[name] = dataA[name].astype(object)
-                # ",".join([str(val) for val in dataA[name]])
-            else:
-                df[name] = data[name]
-    else:
-        # easy case, all 1-D data so no fussing needed
-        df = pd.DataFrame(data)
+        # Check if the field's dtype includes a subarray shape (multi-dimensional)
+        if len(column_data.shape) > 1:
+            # Convert subarray fields into lists or tuples
+            data_dict[name] = [element for element in column_data]
+        else:
+            # Directly assign the data for 1d dtypes
+            data_dict[name] = column_data
 
-    # clean times
-    df["Time"] = pd.to_datetime(
-        df["Time"].str.decode("utf-8")
-    )  # hapitime2datetime(np.array(dfA['Time']),**ops)
-    if round_to_sec:
-        df["Time"] = df["Time"].dt.round("S")
-    df["Time"] = df["Time"].dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-
+    df = pd.DataFrame(data_dict)
+    df = clean_time(df, round_to_sec=round_to_sec)
     return df
 
 
