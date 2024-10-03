@@ -176,8 +176,8 @@ def resample_hapi(
     limit: int | None = None,
 ):
     """
-    Resample hapi data at specified intervals. If an exact time does not exist,
-    substitutes with nearest time.
+    Resample hapi data at specified intervals. If data for a time does not exist,
+    uses data value from the nearest time.
     """
     df = hapi_to_df(data, round_to_sec=round_to_sec)
 
