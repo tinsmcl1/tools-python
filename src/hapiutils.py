@@ -1,11 +1,11 @@
-from hapiclient.hapitime import hapitime2datetime, datetime2hapitime
-import numpy.lib.recfunctions as nrecfun
-import numpy as np
-import pandas as pd
 import copy
-from datetime import datetime, timedelta
 from typing import Literal
+
+import numpy as np
+import numpy.lib.recfunctions as nrecfun
+import pandas as pd
 from hapiclient.hapi import compute_dt
+from hapiclient.hapitime import hapitime2datetime, datetime2hapitime
 
 
 def nparray_unpack_to_list(arr) -> list:
@@ -59,17 +59,27 @@ def hapi_to_df(data, round_to_sec: bool = False) -> pd.DataFrame:
 
 
 def merge_hapi(
-    dataA, metaA, dataB, metaB, how: Literal["left", "right", "outer", "inner"] = "outer", round_to_sec: bool = False, fill_nan: bool = False):
-    """Merge two hapi data arrays to single array via specified merge type. Returns merged hapi data and meta objects.
+    dataA,
+    metaA,
+    dataB,
+    metaB,
+    how: Literal["left", "right", "outer", "inner"] = "outer",
+    round_to_sec: bool = False,
+    fill_nan: bool = False,
+):
+    """Merge two hapi data arrays to single array via specified merge type. Returns 
+    merged hapi data and meta objects.
 
     Args:
         dataA: Left hapi array to merge
         metaA: Meta corresponding with dataA
         dataB: Right hapi array to merge
         metaB: Meta corresponding with dataB
-        how (str, optional): Type of merge: 'left', 'right', 'outer', or 'inner'. See documentation for pandas.merge_ordered for descriptions. Defaults to 'outer'.
+        how (str, optional): Type of merge: 'left', 'right', 'outer', or 'inner'. See 
+            documentation for pandas.merge_ordered for descriptions. Defaults to 'outer'.
         round_to_sec (bool, optional): Rounds time to nearest second. Defaults to False.
-        fill_nan (bool, optional): Fill NaNs according to fill_value from meta. Defaults to False.
+        fill_nan (bool, optional): Fill NaNs according to fill_value from meta. Defaults 
+            to False.
     """
     metaAB = copy.deepcopy(metaA)
     new_names = {}
@@ -77,7 +87,7 @@ def merge_hapi(
         if param["name"] != "Time":
             # If the field is already in the left array, change the field name
             if param in metaA["parameters"]:
-                new_name = f"{param['name']}_{metaB['x_dataset']}"  # TODO: does x_dataset always exist?
+                new_name = f"{param['name']}_{metaB['x_dataset']}"  # Does x_dataset always exist?
                 new_names[param["name"]] = new_name
                 param["name"] = new_name
             # Update meta
@@ -154,3 +164,59 @@ def df_to_hapi(df, meta):
     data = np.array([tuple(i) for i in data], dtype=dt)
     return data
 
+
+def resample_hapi(
+    data,
+    meta,
+    interval: str,
+    round_to_sec: bool = False,
+    tolerance: float | None = None,
+    start_time: str | None = None,
+    end_time: str | None = None,
+    limit: int | None = None,
+):
+    """
+    Resample hapi data at specified intervals. If an exact time does not exist,
+    substitutes with nearest time.
+    """
+    df = hapi_to_df(data, round_to_sec=round_to_sec)
+
+    # Format dataframe for pandas resampling
+    # df["Time"] = pd.to_datetime(df["Time"])
+    df["Time"] = hapitime2datetime(df["Time"].values)
+    df = df.set_index("Time")
+
+    if start_time is not None:
+        start_time = pd.to_datetime(start_time)
+        df = df[df.index >= start_time]
+
+    if end_time is not None:
+        end_time = pd.to_datetime(end_time)
+        df = df[df.index <= end_time]
+
+    if tolerance:
+        target_times = pd.date_range(
+            start=df.index.min(), end=df.index.max(), freq=interval
+        )
+        tolerance_timedelta = pd.to_timedelta(tolerance)
+
+        # Iterate over each target time and find the closest time within the tolerance
+        sampled_rows = []
+        for target_time in target_times:
+            time_diffs = abs((df.index - target_time).total_seconds())
+            closest_idx = time_diffs.idxmin()
+            if time_diffs[closest_idx] <= tolerance_timedelta:
+                sampled_rows.append(df.loc[closest_idx])
+
+        resampled_df = pd.DataFrame(sampled_rows).reset_index()
+
+    else:
+        # Resample the DataFrame using the nearest value
+        resampled_df = df.resample(interval, origin="start").nearest(limit=limit)
+        resampled_df = resampled_df.reset_index()
+
+    resampled_meta = copy.deepcopy(meta)  # Does meta need to be updated?
+    resampled_df["Time"] = resampled_df["Time"].dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    # resampled_df["Time"] = datetime2hapitime(resampled_df["Time"].values)
+    resampled_data = df_to_hapi(resampled_df, resampled_meta)
+    return resampled_data, resampled_meta  # , resampled_df
